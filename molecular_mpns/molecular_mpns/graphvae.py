@@ -75,7 +75,7 @@ class GraphVAE(torch.nn.Module):
         self.n_atoms = n_atoms
         self.z_dim = z_dim
         self.cutoff = cutoff
-        self.adjacency = adjacency
+        self.register_buffer('adjacency', adjacency)
         self.encoder = Encoder(in_channels = x_dim, hidden_channels = enc_hidden_channels, out_channels = z_dim,
                                num_hidden_layers = num_enc_hidden_layers)
         dec_out_channels = int(x_dim*n_atoms) if not output_dists else int(n_atoms*(n_atoms-1) / 2)
@@ -100,8 +100,9 @@ class GraphVAE(torch.nn.Module):
         return mu_z, logvar_z, mu_x, logvar_x
     
     def mwg_sample(self, N):
+        dev = self.encoder.mu.weight.device
         samples = np.zeros((N, self.n_atoms * self.x_dim))
-        x, z = torch.randn((self.n_atoms, self.x_dim)), torch.randn((1,self.z_dim))
+        x, z = torch.randn((self.n_atoms, self.x_dim)).to(dev), torch.randn((1,self.z_dim)).to(dev)
         
         for n in range(N):
             with torch.no_grad():
@@ -139,8 +140,8 @@ class GraphVAE(torch.nn.Module):
         return samples
     
     def ancestral_sample(self, N):
-        
-        z = torch.randn((N,self.z_dim))
+        dev = self.encoder.mu.weight.device
+        z = torch.randn((N,self.z_dim)).to(dev)
         with torch.no_grad():
             mu_x, logvar_x = self.decoder(z)
             x = self.reparameterize(mu_x, logvar_x)
@@ -148,7 +149,8 @@ class GraphVAE(torch.nn.Module):
         return x.cpu().numpy()
     
     def sample_decoder_means(self,N):
-        z = torch.randn((N,self.z_dim))
+        dev = self.encoder.mu.weight.device
+        z = torch.randn((N,self.z_dim)).to(dev)
         with torch.no_grad():
             mu_x, _ = self.decoder(z)
         return mu_x.cpu().numpy()
