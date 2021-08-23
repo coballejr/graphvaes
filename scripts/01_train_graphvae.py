@@ -147,4 +147,4 @@ plt.show()
 plt.close()
 
 os.chdir(model_dir)
-torch.save(mod, 'mod01.pth')
+torch.save(mod.state_dict(), 'mod01.pth')
