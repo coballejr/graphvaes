@@ -1,0 +1,13 @@
+#!/bin/bash
+#$ -M coballe@nd.edu
+#$ -m abe
+#$ -q gpu@@zabaras 
+#$ -pe smp 1
+#$ -l gpu=1
+
+conda activate graphvaes
+python train_z8n200.py
+
+
+
+
