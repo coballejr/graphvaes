@@ -35,8 +35,13 @@ class Encoder(torch.nn.Module):
             else:
                 raise ValueError('No adjacency matrix or cutoff parameter specified.')
         
-        for gc_layer in self.gc_layers:
-            x = self.act(gc_layer(x, edge_index))
+        for l, gc_layer in enumerate(self.gc_layers):
+            if l == 0:
+                x = torch.nn.functional.selu(gc_layer(x, edge_index))
+            elif l == (len(self.gc_layers) - 1):
+                x = torch.log(torch.nn.functional.sigmoid(gc_layer(x, edge_index)))
+            else:
+                x = self.act(gc_layer(x, edge_index))
         
         mu_z = self.mu(x, edge_index)
         logvar_z = self.logvar(x, edge_index)
@@ -60,8 +65,12 @@ class Decoder(torch.nn.Module):
         
     def forward(self, z):
         
-        for lin in self.lins:
-            z = self.act(lin(z))
+        for l, lin in enumerate(self.lins):
+            if ((l == 0) or (l == (len(self.lins) - 1))):
+                z = torch.tanh(lin(z))
+            else:
+                z = self.act(lin(z))
+        
         mu_x = self.mu_x(z)
         logvar_x = self.logvar_x.repeat(mu_x.shape[0],1)
         
@@ -69,7 +78,7 @@ class Decoder(torch.nn.Module):
     
 class GraphVAE(torch.nn.Module):
     
-    def __init__(self, x_dim, enc_hidden_channels, z_dim, num_enc_hidden_layers, dec_hidden_channels, num_dec_hidden_layers ,n_atoms = 22, cutoff = 0.5, adjacency = None, output_dists = True):
+    def __init__(self, x_dim, enc_hidden_channels, z_dim, num_enc_hidden_layers, dec_hidden_channels, num_dec_hidden_layers, enc_act, dec_act ,n_atoms = 22, cutoff = 0.5, adjacency = None, output_dists = True):
         super(GraphVAE,self).__init__()
         self.x_dim = x_dim
         self.n_atoms = n_atoms
@@ -77,9 +86,9 @@ class GraphVAE(torch.nn.Module):
         self.cutoff = cutoff
         self.register_buffer('adjacency', adjacency)
         self.encoder = Encoder(in_channels = x_dim, hidden_channels = enc_hidden_channels, out_channels = z_dim,
-                               num_hidden_layers = num_enc_hidden_layers)
+                               num_hidden_layers = num_enc_hidden_layers, act = enc_act)
         dec_out_channels = int(x_dim*n_atoms) if not output_dists else int(n_atoms*(n_atoms-1) / 2)
-        self.decoder = Decoder(in_channels = z_dim, hidden_channels = dec_hidden_channels, out_channels = dec_out_channels, num_hidden_layers = num_dec_hidden_layers)
+        self.decoder = Decoder(in_channels = z_dim, hidden_channels = dec_hidden_channels, out_channels = dec_out_channels, num_hidden_layers = num_dec_hidden_layers, act = dec_act)
         
     def reparameterize(self ,mu_z, logvar_z):
         sigma = torch.exp(0.5*logvar_z)
@@ -158,7 +167,7 @@ class GraphVAE(torch.nn.Module):
         
             
         
-def VAEloss(data, mu_x, logvar_x ,mu_z, logvar_z):
+def VAEloss(data, mu_x, logvar_x ,mu_z, logvar_z, kl_weight = 1):
     
     # recon loss for p(x | z)
     pointwiseMSEloss = 0.5*torch.nn.functional.mse_loss(mu_x, data,reduction = 'none')
@@ -172,6 +181,6 @@ def VAEloss(data, mu_x, logvar_x ,mu_z, logvar_z):
     # KLD loss for q(z | x)
     KLD = -0.5 * torch.sum(1 + logvar_z - mu_z**2 - torch.exp(logvar_z))
     
-    loss = (KLD + WeightedMSEloss + logvarobjective)
+    loss = (kl_weight*KLD + WeightedMSEloss + logvarobjective)
     
     return loss, KLD, WeightedMSEloss, logvarobjective
