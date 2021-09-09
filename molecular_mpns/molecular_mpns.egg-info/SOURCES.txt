@@ -3,7 +3,10 @@ molecular_mpns/__init__.py
 molecular_mpns/data.py
 molecular_mpns/graphvae.py
 molecular_mpns/math.py
+molecular_mpns/physicsvae.py
+molecular_mpns/toysystems.py
 molecular_mpns/training_utils.py
+molecular_mpns/utils.py
 molecular_mpns.egg-info/PKG-INFO
 molecular_mpns.egg-info/SOURCES.txt
 molecular_mpns.egg-info/dependency_links.txt
